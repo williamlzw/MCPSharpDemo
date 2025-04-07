@@ -3,6 +3,7 @@ using ModelContextProtocol;
 using Microsoft.ML.OnnxRuntimeGenAI;
 using Microsoft.Extensions.AI;
 using ModelContextProtocol.Protocol.Types;
+using System.Runtime.InteropServices;
 
 public sealed class McpClientWrapper : IAsyncDisposable
 {
@@ -43,13 +44,16 @@ public sealed class AIChatClientWrapper : IDisposable
     private readonly string _modelPath;
     private readonly Model _model;
     private readonly Tokenizer _tokenizer;
+    private readonly Config _config;
+    private readonly OgaHandle _ogaHandle;
     private readonly OnnxRuntimeGenAIChatClient _chatClient;
 
     public AIChatClientWrapper(string modelPath)
     {
         _modelPath = modelPath;
-        var config = CreateModelConfig();
-        _model = new Model(config);
+        _ogaHandle = new OgaHandle();
+        _config = CreateModelConfig();
+        _model = new Model(_config);
         _tokenizer = new Tokenizer(_model);
         _chatClient = CreateChatClient();
     }
@@ -73,8 +77,10 @@ public sealed class AIChatClientWrapper : IDisposable
     public void Dispose()
     {
         _chatClient.Dispose();
-        _tokenizer.Dispose();
         _model.Dispose();
+        _tokenizer.Dispose();
+        _config.Dispose();
+        _ogaHandle.Dispose();
     }
 
     private Config CreateModelConfig()

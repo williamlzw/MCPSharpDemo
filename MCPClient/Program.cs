@@ -64,6 +64,7 @@ public class Program
                 await service.StartChatLoopAsync(scenarios[selectedKey]);
             }
         }
+        service.Dispose();
     }
 
     private static bool IsExitCommand(string? input)

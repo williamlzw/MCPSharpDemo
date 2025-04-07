@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
 
-public sealed class ChatService
+public sealed class ChatService : IDisposable
 {
     private readonly AIChatClientWrapper _aiClient;
     private readonly McpClientWrapper _mcpClient;
@@ -13,6 +13,12 @@ public sealed class ChatService
     {
         _aiClient = aiClient;
         _mcpClient = mcpClient;
+    }
+
+    public void Dispose()
+    {
+        _aiClient.Dispose();
+        _mcpClient.DisposeAsync().GetAwaiter().GetResult();
     }
 
     public async Task<IEnumerable<AITool>> GetToolsAsync()
