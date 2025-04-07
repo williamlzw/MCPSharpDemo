@@ -3,7 +3,7 @@ using ModelContextProtocol;
 using Microsoft.ML.OnnxRuntimeGenAI;
 using Microsoft.Extensions.AI;
 using ModelContextProtocol.Protocol.Types;
-using System.Runtime.InteropServices;
+
 
 public sealed class McpClientWrapper : IAsyncDisposable
 {
@@ -92,5 +92,5 @@ public sealed class AIChatClientWrapper : IDisposable
     }
 
     private OnnxRuntimeGenAIChatClient CreateChatClient() =>
-        new (_model, options:OnnxRuntimeGenAIChatClientOptionsGenerator.GetDefault());
+        new (_model, options:OnnxRuntimeGenAIChatClientOptionsGenerator.GetPhi4());
 }

@@ -4,7 +4,7 @@ using Microsoft.ML.OnnxRuntimeGenAI;
 
 public static class OnnxRuntimeGenAIChatClientOptionsGenerator
 {
-    public static OnnxRuntimeGenAIChatClientOptions GetDefault() => new()
+    public static OnnxRuntimeGenAIChatClientOptions GetPhi4() => new()
     {
         StopSequences = ["<|system|>", "<|user|>", "<|assistant|>", "<|end|>"],
         PromptFormatter = static (messages, _) =>

@@ -7,8 +7,8 @@ public class Program
     public static async Task Main()
     {
         var config = new AppConfig(
-            ModelPath: "d:\\model\\Phi-4-mini-instruct-onnx-int4",
-            McpLocation: "d:\\MCPServer\\bin\\Debug\\net9.0\\MCPServer.exe"
+            ModelPath: "D:\\model\\phi-4-onnx",
+            McpLocation: "D:\\MCPServer\\bin\\Debug\\net9.0\\MCPServer.exe"
         );
 
         var (mcpClient, aiClient) = await InitializeClientsAsync(config);

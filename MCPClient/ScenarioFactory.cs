@@ -15,13 +15,11 @@ public static class ScenarioFactory
 {
     public static Dictionary<string, ChatScenarioConfig> CreateScenarios(IEnumerable<AITool> tools)
     {
-        var weatherTool = GetToolByName(tools, "Weather");
         var saveFileTool = GetToolByName(tools, "SaveFile");
 
         return new Dictionary<string, ChatScenarioConfig>
         {
             ["常规对话"] = CreateDefaultConversation(),
-            ["天气助手"] = CreateWeatherAssistant(weatherTool),
             ["编码助手"] = CreateCodingAssistant(saveFileTool)
         };
     }
@@ -34,14 +32,6 @@ public static class ScenarioFactory
         InputHandler = Console.ReadLine
     };
 
-    private static ChatScenarioConfig CreateWeatherAssistant(AITool? tool) => new()
-    {
-        SystemPrompt = BuildWeatherSystemPrompt(tool),
-        Tool = tool,
-        OutputHandler = Console.Write,
-        InputHandler = Console.ReadLine
-    };
-
     private static ChatScenarioConfig CreateCodingAssistant(AITool? tool) => new()
     {
         SystemPrompt = BuildCodingSystemPrompt(tool),
@@ -50,54 +40,29 @@ public static class ScenarioFactory
         InputHandler = Console.ReadLine
     };
 
-    private static string BuildWeatherSystemPrompt(AITool? tool)
-    {
-        var prompt = new StringBuilder();
-        prompt.AppendLine("你是一个专业的天气分析助手，可以使用以下工具获取实时天气数据：");
-
-        if (tool != null)
-        {
-            prompt.AppendLine(FormatToolInfo(tool));
-        }
-
-        prompt.AppendLine("### 使用规范");
-        prompt.AppendLine("1. 当用户询问天气时，必须调用天气查询工具");
-        prompt.AppendLine("2. 严格按照工具参数要求获取城市名称");
-        return prompt.ToString();
-    }
-
     private static string BuildCodingSystemPrompt(AITool? tool)
     {
         return $$"""
-            <|system|>
-            你是一个编码助手。
-            ## 操作规范
-            ### 响应格式
-            必须严格遵循以下结构：
-            ```
-            [回答内容]
+            你是一个编码助手。用中文回答用户问题。你回答完用户问题后需要加入tool_call标签调用工具保存回答内容。
+            内容包含<tool_call>和</tool_call>字样才能调用工具。
+            工具标签必须严格遵循以下结构：
+            '''
             <tool_call>
             {
                 "name": "SaveFile",
                 "parameters": {
                     "filePath": "d:/test.txt",
-                    "fileContent": "[转义后的内容]"
+                    "fileContent": "[回答的内容]"
                 }
             }
             </tool_call>
-            ```
-
-            {{(tool != null ? FormatToolInfo(tool) : "")}}
-            
+            '''
             ### 强制规则
-            1. 路径固定：必须使用 `"filePath": "d:/test.txt"`
+            1. 路径固定: "filePath"固定为"d:/test.txt"
             2. 内容规范：
-               - 必须将完整回答内容放入 `fileContent`
-               - 特殊字符需要转义
+               - 必须将完整回答内容放入 "fileContent",特殊字符需要转义,确保tool_call标签内容是正确json格式。
             3. 调用限制：
                - 每个响应只能包含一个工具调用
-               - 必须位于响应末尾
-            <|end|>
             """;
     }
 
@@ -140,10 +105,6 @@ public static class ScenarioFactory
         {
             new() { Name = "filePath", Type = "string", Description = "文件保存路径" },
             new() { Name = "fileContent", Type = "string", Description = "文件内容" }
-        },
-        "Weather" => new List<ToolParameterInfo>
-        {
-            new() { Name = "location", Type = "string", Description = "城市名称" }
         },
         _ => new List<ToolParameterInfo>()
     };

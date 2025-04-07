@@ -2,6 +2,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
+using ModelContextProtocol.Protocol.Types;
 
 public sealed class ChatService : IDisposable
 {
@@ -33,9 +34,46 @@ public sealed class ChatService : IDisposable
         InitializeChatHistory(config.SystemPrompt);
         var userInput = GetUserInput(config);
         AddUserMessage(userInput!);
-        var response = await ProcessAIResponseAsync(config);
-        if (config.Tool != null && TryParseToolCall(response, out var toolName, out var arguments))
-            await HandleToolCallAsync(toolName, arguments, config);
+        bool doWhile = true;
+        bool doTool = false;
+        while (doWhile)
+        {
+            var response = await ProcessAIResponseAsync(config);
+            if (doTool)
+            {
+                Console.WriteLine($"\n[工具已经调用过，退出]");
+                break;
+            }
+            Console.WriteLine($"[系统]:{response}");
+            if (config.Tool != null && TryParseToolCall(response, out var toolName, out var arguments))
+            {
+                var ret = await HandleToolCallAsync(toolName, arguments, config);
+                if (ret.IsError == false)
+                {
+                    if (ret.Content.Count > 0)
+                    {
+                        Console.WriteLine($"\n[工具返回内容]： {ret.Content[0].Text}");
+                        AddAssistantMessage(ret.Content[0].Text);
+                        doTool = true;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"\n[工具不返回内容]");
+                        doWhile = false;
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"\n[工具调用失败，退出]");
+                    break;
+                }
+            }
+            else
+            {
+                Console.WriteLine($"\n[无工具调用，退出]");
+                break;
+            }
+        }
     }
 
     private async Task<string> ProcessAIResponseAsync(ChatScenarioConfig config)
@@ -65,32 +103,27 @@ public sealed class ChatService : IDisposable
         }
     }
 
-    private async Task HandleToolCallAsync(string toolName, Dictionary<string, object> arguments, ChatScenarioConfig config)
+    private Task<CallToolResponse> HandleToolCallAsync(string toolName, Dictionary<string, object> arguments, ChatScenarioConfig config)
     {
-        try
-        {
-            config.OutputHandler?.Invoke($"\n[系统] 正在调用工具 {toolName}...");
-            await _mcpClient.CallToolAsync(toolName, arguments);
-        }
-        catch (Exception ex)
-        {
-            var errorMsg = $"\n[系统]工具调用失败: {ex.Message}";
-            config.OutputHandler?.Invoke($"\n[错误] {errorMsg}");
-        }
+        config.OutputHandler?.Invoke($"\n[系统] 正在调用工具 {toolName}...");
+        return _mcpClient.CallToolAsync(toolName, arguments);
     }
 
     private bool TryParseToolCall(string response, out string toolName, out Dictionary<string, object> arguments)
     {
-        const string pattern = @"^(?:.*<tool_call>)?\s*({[\s\S]*?})\s*(?:</tool_call>.*)?$";
+        Console.WriteLine($"\n[系统] 解析工具调用");
+        const string pattern = @"<tool_call>(?>(?!</?tool_call>).)*</tool_call>";
         toolName = string.Empty;
         arguments = new Dictionary<string, object>();
         try
         {
-            var match = Regex.Match(response, pattern, RegexOptions.Multiline);
+            var match = Regex.Match(response, pattern, RegexOptions.Singleline);
             if (!match.Success) return false;
-            var jsonContent = match.Groups[1].Value;
-            // 修复示例中的多余闭合括号问题
-            jsonContent = FixJsonFormat(jsonContent);
+            var jsonContent = match.Value;
+            string pattern2 = @"<tool_call>([\s\S]*?)</tool_call>";
+            match = Regex.Match(jsonContent, pattern2, RegexOptions.Singleline);
+            if (!match.Success) return false;
+            jsonContent = match.Groups[1].Value;
             using JsonDocument doc = JsonDocument.Parse(jsonContent);
             var root = doc.RootElement;
             toolName = root.GetProperty("name").GetString() ?? string.Empty;
@@ -117,6 +150,7 @@ public sealed class ChatService : IDisposable
         catch (Exception ex)
         {
             Console.WriteLine($"解析失败: {ex.Message}");
+
             return false;
         }
     }
@@ -151,6 +185,11 @@ public sealed class ChatService : IDisposable
     private void AddUserMessage(string userInput)
     {
         _chatHistory.Add(new ChatMessage(ChatRole.User, userInput!));
+    }
+
+    private void AddAssistantMessage(string input)
+    {
+        _chatHistory.Add(new ChatMessage(ChatRole.Assistant, input!));
     }
 
     private static void ValidateConfig(ChatScenarioConfig config)
